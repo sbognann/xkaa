@@ -32,8 +32,8 @@
 	Clicking on the image will close it. It will also close if you press any KEY, other
 	than META/Windows'''
 
-__version__ = "0.2"
-__author__ = "Salvatore Bognanni <salvo AT unixyouth DOT COM>"
+__version__ = "0.3"
+__author__ = "Salvatore Bognanni <salvogendut AT gmail DOT CoM>"
 
 import os
 import sys
