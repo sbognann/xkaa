@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 ''' main program. This will handle just the parsing of options
 and then it will generate a Puppet object	
 
@@ -7,31 +7,69 @@ blue ink we will run it like this :
 
 xkaasay -c alligator -a say -t 'Hello World!' -i blue '''
 
-
-
-import os,sys,gtk
-from optparse import OptionParser
+import os
+import sys
+import argparse
 import xkaa 
 
-black = (0,0,0)
-red = (255,0.0)
-blue = (0,0,255)
-green = (0,255,0)
+# Define color constants
+COLORS = {
+    'black': (0, 0, 0),
+    'red': (255, 0, 0),
+    'blue': (0, 0, 255),
+    'green': (0, 255, 0)
+}
 
+def parse_color(color_value):
+    """Parse color from string or named color"""
+    if isinstance(color_value, str):
+        # Try as a named color first
+        if color_value.lower() in COLORS:
+            return COLORS[color_value.lower()]
+        
+        # Try parsing as RGB values
+        try:
+            color_str = color_value.strip('()')
+            r, g, b = map(int, color_str.split(','))
+            return (r, g, b)
+        except:
+            return COLORS['black']
+    
+    return COLORS['black']
 
-parser = OptionParser()
+def main():
+    parser = argparse.ArgumentParser(description='Display a character with a speech bubble')
+    parser.add_argument('-t', '--text', 
+                       default="Hello World! Use -h for help",
+                       help="Your text")
+    parser.add_argument('-a', '--action',
+                       default="say",
+                       help="action can be: say, shout, think or dream")
+    parser.add_argument('-d', '--dream',
+                       default="images/sheep.png",
+                       help="path to dream image")
+    parser.add_argument('-c', '--character',
+                       default="snake",
+                       help="character name")
+    parser.add_argument('-i', '--color',
+                       default="black",
+                       help="ink color (name or R,G,B values)")
 
-import optparse
+    args = parser.parse_args()
+    
+    # Parse the color
+    color = parse_color(args.color)
 
-parser = optparse.OptionParser()
-parser.add_option('-t', action="store", default="Hello World! Use -h for help", help="Your text")
-parser.add_option('-a', action="store", default="say", help="action can be: say, shout, think or dream")
-parser.add_option('-d', action="store", default="images/sheep.png", help="path to dream image")
-parser.add_option('-c', action="store", default="snake", help="character name")
-parser.add_option('-i', action="store", default=black, help="ink color")
+    # Create and run the puppet
+    app = xkaa.Puppet(
+        character=args.character,
+        verb=args.action,
+        text=args.text,
+        dreamed=args.dream,
+        font="BonvenoCF-Light.otf",
+        fontcolor=color
+    )
+    app.mainloop()
 
-options, args = parser.parse_args()
-
-xkaa.Puppet(character=options.c,verb=options.a,text=options.t,dreamed=options.d,font="BonvenoCF-Light.otf",fontcolor=options.i)
-gtk.main()
-
+if __name__ == "__main__":
+    main()
