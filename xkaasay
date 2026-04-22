@@ -1,75 +1,43 @@
 #!/usr/bin/python3
 ''' main program. This will handle just the parsing of options
-and then it will generate a Puppet object	
+and then it will generate a Puppet object
 
-if we want to get an alligator character who says 'hello world' in 
+if we want to get an alligator character who says 'hello world' in
 blue ink we will run it like this :
 
 xkaasay -c alligator -a say -t 'Hello World!' -i blue '''
 
+
+
 import os
 import sys
 import argparse
-import xkaa 
+import xkaa
 
-# Define color constants
-COLORS = {
-    'black': (0, 0, 0),
-    'red': (255, 0, 0),
-    'blue': (0, 0, 255),
-    'green': (0, 255, 0)
+black = (0, 0, 0)
+red = (255, 0, 0)
+blue = (0, 0, 255)
+green = (0, 255, 0)
+
+# Color mapping for string inputs
+color_map = {
+	'black': black,
+	'red': red,
+	'blue': blue,
+	'green': green
 }
 
-def parse_color(color_value):
-    """Parse color from string or named color"""
-    if isinstance(color_value, str):
-        # Try as a named color first
-        if color_value.lower() in COLORS:
-            return COLORS[color_value.lower()]
-        
-        # Try parsing as RGB values
-        try:
-            color_str = color_value.strip('()')
-            r, g, b = map(int, color_str.split(','))
-            return (r, g, b)
-        except:
-            return COLORS['black']
-    
-    return COLORS['black']
+parser = argparse.ArgumentParser(description='xKaa - A fun character speech bubble display')
+parser.add_argument('-t', '--text', action="store", default="Hello World! Use -h for help", help="Your text")
+parser.add_argument('-a', '--action', action="store", default="say", help="action can be: say, shout, think or dream")
+parser.add_argument('-d', '--dream', action="store", default="images/sheep.png", help="path to dream image")
+parser.add_argument('-c', '--character', action="store", default="snake", help="character name")
+parser.add_argument('-i', '--ink', action="store", default='black', help="ink color (black, red, blue, green)")
 
-def main():
-    parser = argparse.ArgumentParser(description='Display a character with a speech bubble')
-    parser.add_argument('-t', '--text', 
-                       default="Hello World! Use -h for help",
-                       help="Your text")
-    parser.add_argument('-a', '--action',
-                       default="say",
-                       help="action can be: say, shout, think or dream")
-    parser.add_argument('-d', '--dream',
-                       default="images/sheep.png",
-                       help="path to dream image")
-    parser.add_argument('-c', '--character',
-                       default="snake",
-                       help="character name")
-    parser.add_argument('-i', '--color',
-                       default="black",
-                       help="ink color (name or R,G,B values)")
+args = parser.parse_args()
 
-    args = parser.parse_args()
-    
-    # Parse the color
-    color = parse_color(args.color)
+# Convert ink color from string to tuple if needed
+ink_color = color_map.get(args.ink, black)
 
-    # Create and run the puppet
-    app = xkaa.Puppet(
-        character=args.character,
-        verb=args.action,
-        text=args.text,
-        dreamed=args.dream,
-        font="BonvenoCF-Light.otf",
-        fontcolor=color
-    )
-    app.mainloop()
+xkaa.Puppet(character=args.character, verb=args.action, text=args.text, dreamed=args.dream, font="BonvenoCF-Light.otf", fontcolor=ink_color)
 
-if __name__ == "__main__":
-    main()
