@@ -92,6 +92,11 @@ class Puppet():
 		self.verb = verb
 		self.text = text
 
+		# Dynamic balloon sizing
+		self.balloon_width = 260
+		self.balloon_height = 200
+		self.balloon_padding = 20
+
 		self.popup = self.build_popup()
 
 		# For dragging
@@ -104,6 +109,68 @@ class Puppet():
 		self.app = Gtk.Application(application_id='com.xkaa.puppet')
 		self.app.connect('activate', self.on_activate)
 		self.app.run(None)
+
+	def calculate_text_size(self):
+		"""Calculate the required balloon size based on text content"""
+		if self.verb == 'dream':
+			return self.balloon_width, self.balloon_height
+
+		# Create a temporary image to measure text
+		temp_img = Image.new('RGBA', (1, 1))
+		draw = ImageDraw.Draw(temp_img)
+		font = ImageFont.truetype(self.fontfile, 15)
+
+		# Try different wrapping widths to find optimal layout
+		# Start with reasonable character count and adjust based on text length
+		words = self.text.split()
+		word_count = len(words)
+
+		# Determine wrap width based on total text length
+		if word_count <= 5:
+			wrap_width = 30
+		elif word_count <= 15:
+			wrap_width = 35
+		elif word_count <= 30:
+			wrap_width = 40
+		else:
+			wrap_width = 45
+
+		# Wrap text and calculate required dimensions
+		lines = textwrap.wrap(self.text, width=wrap_width)
+		total_height = 0
+		max_width = 0
+
+		for line in lines:
+			bbox = draw.textbbox((0, 0), line, font=font)
+			line_width = bbox[2] - bbox[0]
+			line_height = bbox[3] - bbox[1]
+			total_height += line_height
+			max_width = max(max_width, line_width)
+
+		# Add padding for text background
+		text_padding = 15
+
+		# Store wrapped lines for later use
+		self.text_lines = lines
+		self.text_area_width = max_width + 2 * text_padding
+		self.text_area_height = total_height + 2 * text_padding
+
+		# For a rectangle to be inscribed in an ellipse:
+		# If the rectangle has dimensions w×h, the ellipse needs semi-axes a×b where:
+		# a = w/√2 and b = h/√2 for maximum inscribed rectangle
+		# So ellipse diameter = rectangle dimension × √2 ≈ 1.414
+		# Add extra factor for comfortable margin: use 1.6 instead of 1.414
+		import math
+		inscription_factor = 1.6
+
+		required_width = self.text_area_width * inscription_factor + 2 * self.balloon_padding
+		required_height = self.text_area_height * inscription_factor + 2 * self.balloon_padding
+
+		# Set minimum and maximum sizes - allow wider balloons
+		self.balloon_width = max(260, min(700, required_width))
+		self.balloon_height = max(200, min(500, required_height))
+
+		return self.balloon_width, self.balloon_height
 
 	def make_dream(self):
 		# combine images together
@@ -123,82 +190,290 @@ class Puppet():
 	def draw_balloons(self, balloontype=None):
 		self.balloontype = balloontype
 		''' this will create a balloon instead of using a premade one '''
-		base = Image.open(self.empty).convert('RGBA')
+
+		# Calculate required size based on text
+		if self.balloontype != 'dream':
+			self.calculate_text_size()
+
+		# Character dimensions
+		character_width = 250
+		character_height = 320  # Character + base height
+		left_margin = 20
+
+		# Layout: Character on LEFT, Balloon on RIGHT (side-by-side)
+		# Canvas width = left margin + character + gap + balloon + right margin
+		gap_between = 20
+		right_margin = 20
+		canvas_width = left_margin + character_width + gap_between + self.balloon_width + right_margin
+
+		# Canvas height = max of character height or balloon height, plus margins
+		top_margin = 20
+		bottom_margin = 20
+		canvas_height = max(character_height, self.balloon_height) + top_margin + bottom_margin
+
+		# Ensure minimum dimensions
+		canvas_width = max(640, canvas_width)
+		canvas_height = max(400, canvas_height)
+
+		# Convert to integers (dimensions may be floats from calculations)
+		canvas_width = int(canvas_width)
+		canvas_height = int(canvas_height)
+
+		# Update image dimensions
+		self.imgW = canvas_width
+		self.imgH = canvas_height
+
+		# Calculate positions
+		# Character on the left side
+		self.character_x = left_margin
+
+		# Character positioned at bottom
+		self.character_y = canvas_height - character_height
+
+		# Balloon to the right of character
+		# Character image is character_width (250px) wide
+		# Balloon should start after character ends
+		balloon_start_x = self.character_x + character_width + gap_between
+
+		# Create base with dynamic size
+		base = Image.new('RGBA', (canvas_width, canvas_height), (255, 255, 255, 0))
 		overlay = Image.new('RGBA', base.size, (255, 255, 255, 0))
 		draw = ImageDraw.Draw(overlay)
+
+		# Calculate balloon coordinates
+		balloon_left = balloon_start_x
+		# Align balloon vertically with character's head area
+		# Character head is roughly at the top 1/4 of character height
+		character_head_y = self.character_y + 60  # Approximate head position
+
+		# Center balloon vertically around character's head
+		balloon_top = character_head_y - self.balloon_height / 2
+		# Ensure balloon doesn't go off top
+		balloon_top = max(top_margin, balloon_top)
+
+		balloon_right = balloon_left + self.balloon_width
+		balloon_bottom = balloon_top + self.balloon_height
+
+		# Store balloon position for text centering later
+		self.balloon_left = balloon_left
+		self.balloon_top = balloon_top
+
 		if self.balloontype == 'say':
-			draw.polygon([(20, 230), (94, 195), (54, 172)], fill='white', outline='black')
-			draw.ellipse((20, 20, 280, 220), fill='white', outline='black')
-			draw.polygon([(20, 230), (94, 195), (54, 172)], fill='white')
+			# Calculate speech bubble tail
+			# Character is on the LEFT, balloon is on the RIGHT
+			# Tail should have WIDE BASE at balloon, NARROW POINT near character's mouth
+
+			# Character's mouth position - on the right side of the face
+			character_mouth_x = self.character_x + 200  # Right edge of character's face
+			character_mouth_y = character_head_y + 60   # Mouth level
+
+			# Balloon attachment - left edge of balloon, aligned with mouth vertically
+			balloon_attachment_x = balloon_left
+			balloon_attachment_y = max(balloon_top + 40, min(balloon_bottom - 40, character_mouth_y))
+
+			# Draw the ellipse first
+			draw.ellipse((balloon_left, balloon_top, balloon_right, balloon_bottom), fill='white', outline='black')
+
+			# Create tail triangle: WIDE BASE at balloon, POINT at character
+			# Calculate the direction vector from character mouth to balloon
+			import math
+			dx = balloon_attachment_x - character_mouth_x
+			dy = balloon_attachment_y - character_mouth_y
+			distance = math.sqrt(dx*dx + dy*dy)
+
+			# Normalize the direction vector
+			if distance > 0:
+				dx_norm = dx / distance
+				dy_norm = dy / distance
+			else:
+				dx_norm, dy_norm = 1, 0
+
+			# Calculate perpendicular vector for the base (rotate 90 degrees)
+			perp_x = -dy_norm
+			perp_y = dx_norm
+
+			# Base width at balloon edge
+			tail_base_spread = 18
+
+			# Create base vertices perpendicular to the tail direction
+			self.tail_points = [
+				(balloon_attachment_x + perp_x * tail_base_spread, balloon_attachment_y + perp_y * tail_base_spread),  # Top of base
+				(character_mouth_x, character_mouth_y),                                                                  # Point at character's mouth
+				(balloon_attachment_x - perp_x * tail_base_spread, balloon_attachment_y - perp_y * tail_base_spread)   # Bottom of base
+			]
 		elif (self.balloontype == 'dream') or (self.balloontype == 'think'):
-			draw.ellipse((20, 20, 280, 220), fill='white', outline='black')
-			draw.ellipse((20, 180, 100, 240), fill='white', outline='black')
-			draw.ellipse((0, 220, 20, 240), fill='white', outline='black')
+			draw.ellipse((balloon_left, balloon_top, balloon_right, balloon_bottom), fill='white', outline='black')
+
+			# Thought bubble circles - dynamically connect to character's head
+			# Position on RIGHT side of character's head (facing balloon)
+			character_head_right_x = self.character_x + 200
+			character_head_right_y = character_head_y + 60
+
+			# Position bubbles in a path from character to balloon
+			# Calculate positions between character and balloon
+			mid_x = (balloon_left + character_head_right_x) / 2
+			mid_y = (balloon_top + self.balloon_height * 0.6 + character_head_right_y) / 2
+
+			# Store bubble positions to draw AFTER character is composited
+			self.thought_bubbles = [
+				(mid_x - 20, mid_y - 10, mid_x + 20, mid_y + 30),  # Larger bubble midway
+				(character_head_right_x + 5, character_head_right_y - 10, character_head_right_x + 20, character_head_right_y + 5)  # Smaller bubble near character
+			]
 		elif self.balloontype == 'shout':
-			draw.polygon([(3, 237), (29, 183), (46, 206), (56, 156),
-					(12, 170), (36, 131), (3, 111), (38, 96),
-					(8, 70), (51, 62), (25, 22), (85, 38), (120, 9),
-					(147, 42), (191, 19), (201, 57), (252, 47), (249, 88),
-					(282, 120), (235, 137), (260, 172), (210, 178),
-					(233, 218), (170, 174), (148, 211), (130, 185),
-					(104, 240), (94, 200), (47, 229), (29, 200)], fill='white', outline='black')
+			# Scale shout polygon based on balloon size
+			scale_x = self.balloon_width / 260
+			scale_y = self.balloon_height / 200
+			shout_points = [
+				(3, 237), (29, 183), (46, 206), (56, 156),
+				(12, 170), (36, 131), (3, 111), (38, 96),
+				(8, 70), (51, 62), (25, 22), (85, 38), (120, 9),
+				(147, 42), (191, 19), (201, 57), (252, 47), (249, 88),
+				(282, 120), (235, 137), (260, 172), (210, 178),
+				(233, 218), (170, 174), (148, 211), (130, 185),
+				(104, 240), (94, 200), (47, 229), (29, 200)
+			]
+			scaled_points = [(int(x * scale_x + balloon_left), int(y * scale_y + balloon_top)) for x, y in shout_points]
+			draw.polygon(scaled_points, fill='white', outline='black')
 		else:
-			draw.ellipse((20, 20, 280, 220), fill='white')
+			draw.ellipse((balloon_left, balloon_top, balloon_right, balloon_bottom), fill='white')
 		out = Image.alpha_composite(base, overlay)
 		out.save(self.balloonbase)
 		return self.balloonbase
 
 	def draw_base(self):
-		posx = 80
-		posy = 200
-		myimage = combine_sources(posx, posy, self.bigbase, self.characterpic, self.imagefile)
+		# Use character position calculated in draw_balloons
+		# Character is positioned on the left side
+		if hasattr(self, 'character_x') and hasattr(self, 'character_y'):
+			self.character_posx = self.character_x
+			self.character_posy = self.character_y
+		else:
+			# Fallback for dream mode
+			self.character_posx = 80
+			self.character_posy = self.imgH - 320
+		myimage = combine_sources(self.character_posx, self.character_posy, self.bigbase, self.characterpic, self.imagefile)
 
 	def build_popup(self):
 
-		# some positioning of balloons here
+		# Draw the balloon (which calculates layout and creates full canvas with balloon)
 		self.baloon = self.draw_balloons(balloontype=self.verb)
 
-		if self.verb == 'say':
-			self.origx = 230
-			self.origy = 10
-			self.textX = 290
-			self.textY = 65
-		elif self.verb == 'think':
-			self.origx = 230
-			self.origy = 10
-			self.textX = 290
-			self.textY = 65
-		elif self.verb == 'dream':
+		# For dream mode, use old positioning
+		if self.verb == 'dream':
 			self.baloon = self.make_dream()
 			self.origx = 220
 			self.origy = 0
-		elif self.verb == 'shout':
-			self.origx = 210
-			self.origy = 10
-			self.textX = 270
-			self.textY = 70
+			balloon_offset_x = 220
 		else:
-			self.origx = 190
-			self.origy = 10
-			self.textX = 260
-			self.textY = 55
+			# The balloon is already drawn on the full canvas at the correct position
+			# We just need to overlay the character
+			# Position for overlaying is (0, 0) since balloon canvas is already full size
+			self.origx = 0
+			self.origy = 0
 
-		# combine images together - Main
+		# Calculate centered position for text box within balloon
+		if hasattr(self, 'text_area_width') and hasattr(self, 'text_area_height') and hasattr(self, 'balloon_left'):
+			# Calculate the center of the elliptical balloon
+			balloon_center_x = self.balloon_left + self.balloon_width / 2
+			balloon_center_y = self.balloon_top + self.balloon_height / 2
+
+			# Position text box so its center aligns with balloon center
+			# The text box starts at center minus half its width/height
+			self.textX = balloon_center_x - self.text_area_width / 2
+			self.textY = balloon_center_y - self.text_area_height / 2
+		else:
+			# Fallback for dream mode
+			self.textX = 40
+			self.textY = 35
+
+		# Create base image for character
 		self.combo = "images/output.png"
-		self.draw_balloons(balloontype=self.verb)
+
+		# First copy the balloon canvas as base
+		import shutil
+		shutil.copy(self.baloon, self.combo)
+
+		# Draw character on separate image
 		self.draw_base()
-		myimage = combine_sources(self.origx, self.origy, self.imagefile, self.baloon, self.combo)
+
+		# Overlay character onto the balloon canvas
+		if self.verb != 'dream':
+			myimage = combine_sources(self.character_posx, self.character_posy, self.combo, self.imagefile, self.combo)
+		else:
+			myimage = combine_sources(self.origx, self.origy, self.imagefile, self.baloon, self.combo)
 
 		# draw text
 		img = Image.open(self.combo)
 		draw = ImageDraw.Draw(img)
 		font = ImageFont.truetype(self.fontfile, 15)
 
+		# Draw tail on top of character (for 'say' mode)
+		if hasattr(self, 'tail_points') and self.tail_points:
+			# Calculate direction from point to base center to extend base into balloon
+			import math
+			# Base center is the midpoint of the two base vertices
+			base_center_x = (self.tail_points[0][0] + self.tail_points[2][0]) / 2
+			base_center_y = (self.tail_points[0][1] + self.tail_points[2][1]) / 2
+
+			# Direction from tip to base
+			dx = base_center_x - self.tail_points[1][0]
+			dy = base_center_y - self.tail_points[1][1]
+			distance = math.sqrt(dx*dx + dy*dy)
+
+			if distance > 0:
+				# Normalize and extend by 5 pixels
+				extend_amount = 5
+				extend_x = (dx / distance) * extend_amount
+				extend_y = (dy / distance) * extend_amount
+
+				extended_tail = [
+					(self.tail_points[0][0] + extend_x, self.tail_points[0][1] + extend_y),  # Top of base - extend into balloon
+					(self.tail_points[1][0], self.tail_points[1][1]),                         # Tip at character - unchanged
+					(self.tail_points[2][0] + extend_x, self.tail_points[2][1] + extend_y)   # Bottom of base - extend into balloon
+				]
+			else:
+				extended_tail = self.tail_points
+
+			# Draw tail with outline
+			draw.polygon(extended_tail, fill='white', outline='black', width=2)
+			# Fill the tail again without outline to ensure solid fill
+			draw.polygon(extended_tail, fill='white')
+
+		# Draw thought bubbles on top of character (for 'think' mode)
+		if hasattr(self, 'thought_bubbles') and self.thought_bubbles:
+			for bubble_coords in self.thought_bubbles:
+				draw.ellipse(bubble_coords, fill='white', outline='black')
+
 		if self.baloon != self.dreamballoon:
-			# handling the wrap around of text is done via textwrap module
-			lines = textwrap.wrap(self.text, width=20)
-			y_text = self.textY
-			x_text = self.textX
+			# Use pre-calculated text lines from calculate_text_size
+			if hasattr(self, 'text_lines'):
+				lines = self.text_lines
+			else:
+				# Fallback if text_lines wasn't calculated
+				lines = textwrap.wrap(self.text, width=35)
+
+			# Calculate text area position
+			text_padding = 15
+			y_text_start = self.origy + self.textY
+			x_text_start = self.origx + self.textX
+
+			# Draw light yellow rectangular background for text area
+			text_bg_x1 = x_text_start - text_padding
+			text_bg_y1 = y_text_start - text_padding
+			text_bg_x2 = text_bg_x1 + self.text_area_width
+			text_bg_y2 = text_bg_y1 + self.text_area_height
+
+			# Light yellow color for note/page effect
+			yellow_bg = (255, 255, 224, 230)  # Light yellow with slight transparency
+			draw.rectangle(
+				[text_bg_x1, text_bg_y1, text_bg_x2, text_bg_y2],
+				fill=yellow_bg,
+				outline=(200, 200, 150),  # Subtle border
+				width=1
+			)
+
+			# Draw text on top of yellow background
+			y_text = y_text_start
+			x_text = x_text_start
 			for line in lines:
 				bbox = draw.textbbox((x_text, y_text), line, font=font)
 				width = bbox[2] - bbox[0]
