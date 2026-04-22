@@ -5,3 +5,26 @@ The snake (and the other animals) image is a freeware from Martin Berube and it 
 taken from http://www.softicons.com/animal-icons/animal-icons-by-martin-berube/snake-icon
 
 the default font comes from : http://openfontlibrary.org/en/font/benveno
+
+INSTALLATION
+============
+Requirements: Python 3, pygame, Pillow
+
+Install dependencies:
+    pip install -r requirements.txt
+
+USAGE
+=====
+Run the xkaasay script:
+    ./xkaasay -c snake -a say -t "Hello World!" -i blue
+
+Options:
+    -c, --character : Character name (snake, bat, donkey, etc.)
+    -a, --action    : Action type (say, shout, think, dream)
+    -t, --text      : Text to display
+    -i, --ink       : Ink color (black, red, blue, green)
+    -d, --dream     : Path to dream image (for dream action)
+
+Controls:
+    - Left click and drag to move the window
+    - Right click or ESC to close

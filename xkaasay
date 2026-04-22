@@ -1,37 +1,43 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 ''' main program. This will handle just the parsing of options
-and then it will generate a Puppet object	
+and then it will generate a Puppet object
 
-if we want to get an alligator character who says 'hello world' in 
+if we want to get an alligator character who says 'hello world' in
 blue ink we will run it like this :
 
 xkaasay -c alligator -a say -t 'Hello World!' -i blue '''
 
 
 
-import os,sys,gtk
-from optparse import OptionParser
-import xkaa 
+import os
+import sys
+import argparse
+import xkaa
 
-black = (0,0,0)
-red = (255,0.0)
-blue = (0,0,255)
-green = (0,255,0)
+black = (0, 0, 0)
+red = (255, 0, 0)
+blue = (0, 0, 255)
+green = (0, 255, 0)
 
+# Color mapping for string inputs
+color_map = {
+	'black': black,
+	'red': red,
+	'blue': blue,
+	'green': green
+}
 
-parser = OptionParser()
+parser = argparse.ArgumentParser(description='xKaa - A fun character speech bubble display')
+parser.add_argument('-t', '--text', action="store", default="Hello World! Use -h for help", help="Your text")
+parser.add_argument('-a', '--action', action="store", default="say", help="action can be: say, shout, think or dream")
+parser.add_argument('-d', '--dream', action="store", default="images/sheep.png", help="path to dream image")
+parser.add_argument('-c', '--character', action="store", default="snake", help="character name")
+parser.add_argument('-i', '--ink', action="store", default='black', help="ink color (black, red, blue, green)")
 
-import optparse
+args = parser.parse_args()
 
-parser = optparse.OptionParser()
-parser.add_option('-t', action="store", default="Hello World! Use -h for help", help="Your text")
-parser.add_option('-a', action="store", default="say", help="action can be: say, shout, think or dream")
-parser.add_option('-d', action="store", default="images/sheep.png", help="path to dream image")
-parser.add_option('-c', action="store", default="snake", help="character name")
-parser.add_option('-i', action="store", default=black, help="ink color")
+# Convert ink color from string to tuple if needed
+ink_color = color_map.get(args.ink, black)
 
-options, args = parser.parse_args()
-
-xkaa.Puppet(character=options.c,verb=options.a,text=options.t,dreamed=options.d,font="BonvenoCF-Light.otf",fontcolor=options.i)
-gtk.main()
+xkaa.Puppet(character=args.character, verb=args.action, text=args.text, dreamed=args.dream, font="BonvenoCF-Light.otf", fontcolor=ink_color)
 
