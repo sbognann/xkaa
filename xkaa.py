@@ -208,7 +208,7 @@ class Puppet():
 
 		# Canvas height = max of character height or balloon height, plus margins
 		top_margin = 20
-		bottom_margin = 20
+		bottom_margin = 60  # Extra space so character's base is visible
 		canvas_height = max(character_height, self.balloon_height) + top_margin + bottom_margin
 
 		# Ensure minimum dimensions
@@ -227,8 +227,9 @@ class Puppet():
 		# Character on the left side
 		self.character_x = left_margin
 
-		# Character positioned at bottom
-		self.character_y = canvas_height - character_height
+		# Character positioned with some bottom margin so we can see its base
+		bottom_character_margin = 40  # Space below character so bottom is visible
+		self.character_y = canvas_height - character_height - bottom_character_margin
 
 		# Balloon to the right of character
 		# Character image is character_width (250px) wide
@@ -259,48 +260,77 @@ class Puppet():
 		self.balloon_top = balloon_top
 
 		if self.balloontype == 'say':
-			# Calculate speech bubble tail
-			# Character is on the LEFT, balloon is on the RIGHT
-			# Tail should have WIDE BASE at balloon, NARROW POINT near character's mouth
-
-			# Character's mouth position - on the right side of the face
-			character_mouth_x = self.character_x + 200  # Right edge of character's face
-			character_mouth_y = character_head_y + 60   # Mouth level
-
-			# Balloon attachment - left edge of balloon, aligned with mouth vertically
-			balloon_attachment_x = balloon_left
-			balloon_attachment_y = max(balloon_top + 40, min(balloon_bottom - 40, character_mouth_y))
-
-			# Draw the ellipse first
-			draw.ellipse((balloon_left, balloon_top, balloon_right, balloon_bottom), fill='white', outline='black')
-
-			# Create tail triangle: WIDE BASE at balloon, POINT at character
-			# Calculate the direction vector from character mouth to balloon
+			# Draw unified balloon + tail as ONE continuous shape
 			import math
-			dx = balloon_attachment_x - character_mouth_x
-			dy = balloon_attachment_y - character_mouth_y
-			distance = math.sqrt(dx*dx + dy*dy)
 
-			# Normalize the direction vector
-			if distance > 0:
-				dx_norm = dx / distance
-				dy_norm = dy / distance
-			else:
-				dx_norm, dy_norm = 1, 0
+			# Character's mouth position
+			character_mouth_x = self.character_x + 200
+			character_mouth_y = character_head_y + 60
 
-			# Calculate perpendicular vector for the base (rotate 90 degrees)
-			perp_x = -dy_norm
-			perp_y = dx_norm
+			# Tail attachment area
+			balloon_attachment_y = max(balloon_top + 40, min(balloon_bottom - 40, character_mouth_y))
+			tail_spread = 30
+			tail_top_y = balloon_attachment_y - tail_spread
+			tail_bottom_y = balloon_attachment_y + tail_spread
 
-			# Base width at balloon edge
-			tail_base_spread = 18
+			# Create unified shape by tracing the outline
+			# Start from top of balloon, go around clockwise, include tail, complete circle
 
-			# Create base vertices perpendicular to the tail direction
-			self.tail_points = [
-				(balloon_attachment_x + perp_x * tail_base_spread, balloon_attachment_y + perp_y * tail_base_spread),  # Top of base
-				(character_mouth_x, character_mouth_y),                                                                  # Point at character's mouth
-				(balloon_attachment_x - perp_x * tail_base_spread, balloon_attachment_y - perp_y * tail_base_spread)   # Bottom of base
-			]
+			center_x = (balloon_left + balloon_right) / 2
+			center_y = (balloon_top + balloon_bottom) / 2
+			radius_x = (balloon_right - balloon_left) / 2
+			radius_y = (balloon_bottom - balloon_top) / 2
+
+			outline_points = []
+
+			# Calculate angles for tail attachment points
+			# Angle from center to tail points
+			tail_top_angle = math.atan2(tail_top_y - center_y, balloon_left - center_x)
+			tail_bottom_angle = math.atan2(tail_bottom_y - center_y, balloon_left - center_x)
+
+			# Draw ellipse outline going clockwise, skipping the tail section
+			num_ellipse_points = 100
+			for i in range(num_ellipse_points + 1):
+				angle = (2 * math.pi * i) / num_ellipse_points - math.pi  # Start from left (-pi)
+
+				# Skip the section where the tail connects
+				if tail_bottom_angle <= angle <= tail_top_angle:
+					if len(outline_points) == 0 or outline_points[-1] != (balloon_left, tail_top_y):
+						# Add top tail attachment point
+						outline_points.append((balloon_left, tail_top_y))
+					continue
+
+				x = center_x + radius_x * math.cos(angle)
+				y = center_y + radius_y * math.sin(angle)
+				outline_points.append((x, y))
+
+			# Add curved tail
+			# Top curve of tail
+			num_tail_points = 12
+			for i in range(num_tail_points + 1):
+				t = i / num_tail_points
+				ctrl_x = (balloon_left + character_mouth_x) / 2 - 15
+				ctrl_y = (tail_top_y + character_mouth_y) / 2
+
+				x = (1-t)**2 * balloon_left + 2*(1-t)*t * ctrl_x + t**2 * character_mouth_x
+				y = (1-t)**2 * tail_top_y + 2*(1-t)*t * ctrl_y + t**2 * character_mouth_y
+				outline_points.append((x, y))
+
+			# Bottom curve of tail (reverse)
+			for i in range(num_tail_points, -1, -1):
+				t = i / num_tail_points
+				ctrl_x = (balloon_left + character_mouth_x) / 2 - 15
+				ctrl_y = (tail_bottom_y + character_mouth_y) / 2
+
+				x = (1-t)**2 * character_mouth_x + 2*(1-t)*t * ctrl_x + t**2 * balloon_left
+				y = (1-t)**2 * character_mouth_y + 2*(1-t)*t * ctrl_y + t**2 * tail_bottom_y
+				outline_points.append((x, y))
+
+			# Draw the complete unified shape
+			draw.polygon(outline_points, fill='white', outline='black', width=2)
+
+			# Mark that we drew the unified shape (no separate tail needed)
+			self.tail_data = None
 		elif (self.balloontype == 'dream') or (self.balloontype == 'think'):
 			draw.ellipse((balloon_left, balloon_top, balloon_right, balloon_bottom), fill='white', outline='black')
 
@@ -406,37 +436,43 @@ class Puppet():
 		draw = ImageDraw.Draw(img)
 		font = ImageFont.truetype(self.fontfile, 15)
 
-		# Draw tail on top of character (for 'say' mode)
-		if hasattr(self, 'tail_points') and self.tail_points:
-			# Calculate direction from point to base center to extend base into balloon
+		# Draw curved tail on top of character (for 'say' mode)
+		if hasattr(self, 'tail_data') and self.tail_data:
 			import math
-			# Base center is the midpoint of the two base vertices
-			base_center_x = (self.tail_points[0][0] + self.tail_points[2][0]) / 2
-			base_center_y = (self.tail_points[0][1] + self.tail_points[2][1]) / 2
+			tail = self.tail_data
 
-			# Direction from tip to base
-			dx = base_center_x - self.tail_points[1][0]
-			dy = base_center_y - self.tail_points[1][1]
-			distance = math.sqrt(dx*dx + dy*dy)
+			tip = tail['tip']
+			top_attach = tail['top_attach']
+			bottom_attach = tail['bottom_attach']
 
-			if distance > 0:
-				# Normalize and extend by 5 pixels
-				extend_amount = 5
-				extend_x = (dx / distance) * extend_amount
-				extend_y = (dy / distance) * extend_amount
+			# Create smooth curved tail
+			curved_points = []
 
-				extended_tail = [
-					(self.tail_points[0][0] + extend_x, self.tail_points[0][1] + extend_y),  # Top of base - extend into balloon
-					(self.tail_points[1][0], self.tail_points[1][1]),                         # Tip at character - unchanged
-					(self.tail_points[2][0] + extend_x, self.tail_points[2][1] + extend_y)   # Bottom of base - extend into balloon
-				]
-			else:
-				extended_tail = self.tail_points
+			# Top curve: from top attachment point to tip
+			num_points = 12
+			for i in range(num_points + 1):
+				t = i / num_points
+				# Quadratic bezier with control point offset to create curve
+				ctrl_x = (top_attach[0] + tip[0]) / 2 - 15
+				ctrl_y = (top_attach[1] + tip[1]) / 2
 
-			# Draw tail with outline
-			draw.polygon(extended_tail, fill='white', outline='black', width=2)
-			# Fill the tail again without outline to ensure solid fill
-			draw.polygon(extended_tail, fill='white')
+				x = (1-t)**2 * top_attach[0] + 2*(1-t)*t * ctrl_x + t**2 * tip[0]
+				y = (1-t)**2 * top_attach[1] + 2*(1-t)*t * ctrl_y + t**2 * tip[1]
+				curved_points.append((x, y))
+
+			# Bottom curve: from tip back to bottom attachment point
+			for i in range(num_points, -1, -1):
+				t = i / num_points
+				ctrl_x = (bottom_attach[0] + tip[0]) / 2 - 15
+				ctrl_y = (bottom_attach[1] + tip[1]) / 2
+
+				x = (1-t)**2 * tip[0] + 2*(1-t)*t * ctrl_x + t**2 * bottom_attach[0]
+				y = (1-t)**2 * tip[1] + 2*(1-t)*t * ctrl_y + t**2 * bottom_attach[1]
+				curved_points.append((x, y))
+
+			# Draw the curved tail
+			draw.polygon(curved_points, fill='white', outline='black', width=2)
+			draw.polygon(curved_points, fill='white')
 
 		# Draw thought bubbles on top of character (for 'think' mode)
 		if hasattr(self, 'thought_bubbles') and self.thought_bubbles:
