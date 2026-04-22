@@ -5,7 +5,7 @@ A Python 3 rework of xcowsay (http://www.doof.me.uk/xcowsay/). The name is inspi
 
 ## Requirements
 - Python 3
-- pygame
+- GTK4
 - Pillow
 
 ## Installation
