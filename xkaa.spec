@@ -33,7 +33,7 @@ Features:
 - Interactive: drag to move, click to close
 
 %prep
-%setup -q
+%setup -q -n xkaa
 
 %build
 # Nothing to build - pure Python
@@ -73,7 +73,7 @@ chmod 755 %{buildroot}%{_prefix}/local/bin/xkaasay
 %doc README.md
 
 %changelog
-* Wed Apr 23 2026 Salvatore Bognanni <salvo@unixyouth.com> - 0.2-1
+* Thu Apr 23 2026 Salvatore Bognanni <salvo@unixyouth.com> - 0.2-1
 - SVG-based speech bubbles with organic curved tails
 - Dynamic balloon sizing based on text length
 - Bubble placement option (left, right, random)
@@ -82,7 +82,7 @@ chmod 755 %{buildroot}%{_prefix}/local/bin/xkaasay
 - Yellow text background for better readability
 - Improved text wrapping algorithm
 
-* Mon Apr 21 2026 Salvatore Bognanni <salvo@unixyouth.com> - 0.1-1
+* Tue Apr 21 2026 Salvatore Bognanni <salvo@unixyouth.com> - 0.1-1
 - Initial RPM release
 - Python 3 rework of xcowsay
 - GTK4 support
