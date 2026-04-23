@@ -7,6 +7,7 @@ A Python 3 rework of xcowsay (http://www.doof.me.uk/xcowsay/). The name is inspi
 - Python 3
 - GTK4
 - Pillow
+- CairoSVG
 
 ## Installation
 ```bash
