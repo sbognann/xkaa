@@ -45,6 +45,9 @@ from PIL import ImageFont
 from PIL import ImageDraw
 from PIL import Image
 import textwrap
+import random
+import io
+import cairosvg
 
 imgdir = "images"
 fontdir = "fonts"
@@ -68,7 +71,7 @@ def combine_sources(posx, posy, img1, img2, final):
 
 class Puppet():
 
-	def __init__(self, character=None, verb=None, text=None, dreamed=None, font=None, fontcolor=(0, 0, 0)):
+	def __init__(self, character=None, verb=None, text=None, dreamed=None, font=None, fontcolor=(0, 0, 0), placement='random'):
 
 		self.imgW = 640
 		self.imgH = 520
@@ -88,6 +91,7 @@ class Puppet():
 		self.title = "xKaa"
 		self.dreamed = dreamed
 		self.fontcolor = fontcolor
+		self.placement = placement
 
 		self.verb = verb
 		self.text = text
@@ -187,6 +191,80 @@ class Puppet():
 		myimage = combine_sources(posx, posy, self.balloonbase, self.minidream, self.dreamballoon)
 		return self.dreamballoon
 
+	def create_svg_speech_bubble(self, width, height, tail_x, tail_y, bubble_side='right'):
+		"""Create SVG speech bubble (just the bubble) and return tail data separately"""
+		import math
+
+		# Bubble dimensions
+		cx = width / 2
+		cy = height / 2
+		rx = width / 2 - 10
+		ry = height / 2 - 10
+
+		# Stroke widths following the blog post style
+		outer_stroke = 6  # Thicker outer border
+
+		# Create SVG with just the bubble (no tail)
+		svg = f'''<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg">
+		  <defs>
+		    <ellipse id="bubble" cx="{cx}" cy="{cy}" rx="{rx}" ry="{ry}"/>
+		  </defs>
+
+		  <!-- Outer border ellipse with thick stroke -->
+		  <use href="#bubble" fill="none" stroke="#000" stroke-width="{outer_stroke}"/>
+
+		  <!-- Inner white ellipse -->
+		  <use href="#bubble" fill="#fff" stroke="none"/>
+		</svg>'''
+
+		# Calculate tail geometry to be drawn later (after character)
+		tail_angle = math.atan2(tail_y - cy, tail_x - cx)
+
+		# Find the attachment point DEEP INSIDE the ellipse for seamless connection
+		# The 6px border needs to be completely covered, plus we need to extend
+		# far enough inside that the tail merges seamlessly with the bubble fill
+		border_thickness = 6
+		border_coverage = 20  # Go 20px inside to ensure seamless connection
+
+		# Calculate how much to reduce the radius
+		overlap_amount = border_coverage / min(rx, ry)
+		overlap_factor = 1.0 - overlap_amount
+
+		attach_center_x = cx + rx * overlap_factor * math.cos(tail_angle)
+		attach_center_y = cy + ry * overlap_factor * math.sin(tail_angle)
+
+		# Create two attachment points spread perpendicular to the tail direction
+		tail_spread = 35  # Width of tail base at bubble
+		perp_angle = tail_angle + math.pi / 2
+
+		# Two attachment points inside the bubble
+		attach1_x = attach_center_x + tail_spread * math.cos(perp_angle)
+		attach1_y = attach_center_y + tail_spread * math.sin(perp_angle)
+		attach2_x = attach_center_x - tail_spread * math.cos(perp_angle)
+		attach2_y = attach_center_y - tail_spread * math.sin(perp_angle)
+
+		# Calculate control points for smooth organic curves
+		tail_length = math.sqrt((tail_x - attach_center_x)**2 + (tail_y - attach_center_y)**2)
+		curve_offset = tail_length * 0.3  # Amount of curve
+
+		# Control points for curved tail
+		ctrl1_x = attach1_x + (tail_x - attach1_x) * 0.5 + curve_offset * math.sin(tail_angle)
+		ctrl1_y = attach1_y + (tail_y - attach1_y) * 0.5 - curve_offset * math.cos(tail_angle)
+
+		ctrl2_x = tail_x + (attach2_x - tail_x) * 0.5 + curve_offset * math.sin(tail_angle)
+		ctrl2_y = tail_y + (attach2_y - tail_y) * 0.5 - curve_offset * math.cos(tail_angle)
+
+		# Return SVG and tail geometry data
+		tail_data = {
+			'attach1': (attach1_x, attach1_y),
+			'attach2': (attach2_x, attach2_y),
+			'tip': (tail_x, tail_y),
+			'ctrl1': (ctrl1_x, ctrl1_y),
+			'ctrl2': (ctrl2_x, ctrl2_y)
+		}
+
+		return svg, tail_data
+
 	def draw_balloons(self, balloontype=None):
 		self.balloontype = balloontype
 		''' this will create a balloon instead of using a premade one '''
@@ -198,15 +276,20 @@ class Puppet():
 		# Character dimensions
 		character_width = 250
 		character_height = 320  # Character + base height
-		left_margin = 20
+		margin = 20
 
-		# Layout: Character on LEFT, Balloon on RIGHT (side-by-side)
-		# Canvas width = left margin + character + gap + balloon + right margin
+		# Choose bubble position based on placement option
+		if self.placement == 'random':
+			bubble_side = random.choice(['left', 'right'])
+		else:
+			bubble_side = self.placement
+		self.bubble_side = bubble_side
+
+		# Canvas dimensions depend on bubble position
 		gap_between = 20
-		right_margin = 20
-		canvas_width = left_margin + character_width + gap_between + self.balloon_width + right_margin
+		canvas_width = margin + character_width + gap_between + self.balloon_width + margin
 
-		# Canvas height = max of character height or balloon height, plus margins
+		# Canvas height
 		top_margin = 20
 		bottom_margin = 60  # Extra space so character's base is visible
 		canvas_height = max(character_height, self.balloon_height) + top_margin + bottom_margin
@@ -215,7 +298,7 @@ class Puppet():
 		canvas_width = max(640, canvas_width)
 		canvas_height = max(400, canvas_height)
 
-		# Convert to integers (dimensions may be floats from calculations)
+		# Convert to integers
 		canvas_width = int(canvas_width)
 		canvas_height = int(canvas_height)
 
@@ -223,18 +306,23 @@ class Puppet():
 		self.imgW = canvas_width
 		self.imgH = canvas_height
 
-		# Calculate positions
-		# Character on the left side
-		self.character_x = left_margin
+		# Character position (centered in canvas)
+		if bubble_side == 'right':
+			# Character on left, bubble on right
+			self.character_x = margin
+		else:
+			# Character on right, bubble on left
+			self.character_x = canvas_width - margin - character_width
 
-		# Character positioned with some bottom margin so we can see its base
-		bottom_character_margin = 40  # Space below character so bottom is visible
+		# Character positioned with bottom margin
+		bottom_character_margin = 40
 		self.character_y = canvas_height - character_height - bottom_character_margin
 
-		# Balloon to the right of character
-		# Character image is character_width (250px) wide
-		# Balloon should start after character ends
-		balloon_start_x = self.character_x + character_width + gap_between
+		# Balloon position
+		if bubble_side == 'right':
+			balloon_start_x = self.character_x + character_width + gap_between
+		else:
+			balloon_start_x = margin
 
 		# Create base with dynamic size
 		base = Image.new('RGBA', (canvas_width, canvas_height), (255, 255, 255, 0))
@@ -260,77 +348,55 @@ class Puppet():
 		self.balloon_top = balloon_top
 
 		if self.balloontype == 'say':
-			# Draw unified balloon + tail as ONE continuous shape
+			# Generate SVG speech bubble with smooth curves
 			import math
 
-			# Character's mouth position
-			character_mouth_x = self.character_x + 200
-			character_mouth_y = character_head_y + 60
+			# Character's mouth position (side facing the bubble)
+			if bubble_side == 'right':
+				# Bubble on right, character on left - mouth on right side of character's face
+				character_mouth_x = self.character_x + 180
+			else:
+				# Bubble on left, character on right - mouth on left side of character's face
+				character_mouth_x = self.character_x + 70
+			character_mouth_y = character_head_y + 80
 
-			# Tail attachment area
-			balloon_attachment_y = max(balloon_top + 40, min(balloon_bottom - 40, character_mouth_y))
-			tail_spread = 30
-			tail_top_y = balloon_attachment_y - tail_spread
-			tail_bottom_y = balloon_attachment_y + tail_spread
+			# Tail coordinates relative to balloon
+			tail_relative_x = character_mouth_x - balloon_left
+			tail_relative_y = character_mouth_y - balloon_top
 
-			# Create unified shape by tracing the outline
-			# Start from top of balloon, go around clockwise, include tail, complete circle
+			# Generate SVG (just bubble) and get tail data for later
+			svg_content, tail_data = self.create_svg_speech_bubble(
+				int(self.balloon_width),
+				int(self.balloon_height),
+				tail_relative_x,
+				tail_relative_y,
+				bubble_side
+			)
 
-			center_x = (balloon_left + balloon_right) / 2
-			center_y = (balloon_top + balloon_bottom) / 2
-			radius_x = (balloon_right - balloon_left) / 2
-			radius_y = (balloon_bottom - balloon_top) / 2
+			# Convert SVG to PNG
+			try:
+				png_data = cairosvg.svg2png(bytestring=svg_content.encode('utf-8'))
+				bubble_img = Image.open(io.BytesIO(png_data))
 
-			outline_points = []
+				# Paste bubble onto canvas
+				base.paste(bubble_img, (int(balloon_left), int(balloon_top)), bubble_img)
+			except Exception as e:
+				print(f"Error converting SVG: {e}")
+				# Fallback to simple ellipse if SVG conversion fails
+				draw.ellipse((balloon_left, balloon_top, balloon_right, balloon_bottom), fill='white', outline='black')
+				tail_data = None
 
-			# Calculate angles for tail attachment points
-			# Angle from center to tail points
-			tail_top_angle = math.atan2(tail_top_y - center_y, balloon_left - center_x)
-			tail_bottom_angle = math.atan2(tail_bottom_y - center_y, balloon_left - center_x)
-
-			# Draw ellipse outline going clockwise, skipping the tail section
-			num_ellipse_points = 100
-			for i in range(num_ellipse_points + 1):
-				angle = (2 * math.pi * i) / num_ellipse_points - math.pi  # Start from left (-pi)
-
-				# Skip the section where the tail connects
-				if tail_bottom_angle <= angle <= tail_top_angle:
-					if len(outline_points) == 0 or outline_points[-1] != (balloon_left, tail_top_y):
-						# Add top tail attachment point
-						outline_points.append((balloon_left, tail_top_y))
-					continue
-
-				x = center_x + radius_x * math.cos(angle)
-				y = center_y + radius_y * math.sin(angle)
-				outline_points.append((x, y))
-
-			# Add curved tail
-			# Top curve of tail
-			num_tail_points = 12
-			for i in range(num_tail_points + 1):
-				t = i / num_tail_points
-				ctrl_x = (balloon_left + character_mouth_x) / 2 - 15
-				ctrl_y = (tail_top_y + character_mouth_y) / 2
-
-				x = (1-t)**2 * balloon_left + 2*(1-t)*t * ctrl_x + t**2 * character_mouth_x
-				y = (1-t)**2 * tail_top_y + 2*(1-t)*t * ctrl_y + t**2 * character_mouth_y
-				outline_points.append((x, y))
-
-			# Bottom curve of tail (reverse)
-			for i in range(num_tail_points, -1, -1):
-				t = i / num_tail_points
-				ctrl_x = (balloon_left + character_mouth_x) / 2 - 15
-				ctrl_y = (tail_bottom_y + character_mouth_y) / 2
-
-				x = (1-t)**2 * character_mouth_x + 2*(1-t)*t * ctrl_x + t**2 * balloon_left
-				y = (1-t)**2 * character_mouth_y + 2*(1-t)*t * ctrl_y + t**2 * tail_bottom_y
-				outline_points.append((x, y))
-
-			# Draw the complete unified shape
-			draw.polygon(outline_points, fill='white', outline='black', width=2)
-
-			# Mark that we drew the unified shape (no separate tail needed)
-			self.tail_data = None
+			# Store tail data to draw AFTER character (in absolute coordinates)
+			if tail_data:
+				self.tail_data = {
+					'attach1': (tail_data['attach1'][0] + balloon_left, tail_data['attach1'][1] + balloon_top),
+					'attach2': (tail_data['attach2'][0] + balloon_left, tail_data['attach2'][1] + balloon_top),
+					'tip': (tail_data['tip'][0] + balloon_left, tail_data['tip'][1] + balloon_top),
+					'ctrl1': (tail_data['ctrl1'][0] + balloon_left, tail_data['ctrl1'][1] + balloon_top),
+					'ctrl2': (tail_data['ctrl2'][0] + balloon_left, tail_data['ctrl2'][1] + balloon_top)
+				}
+			else:
+				self.tail_data = None
 		elif (self.balloontype == 'dream') or (self.balloontype == 'think'):
 			draw.ellipse((balloon_left, balloon_top, balloon_right, balloon_bottom), fill='white', outline='black')
 
@@ -376,10 +442,20 @@ class Puppet():
 		if hasattr(self, 'character_x') and hasattr(self, 'character_y'):
 			self.character_posx = self.character_x
 			self.character_posy = self.character_y
-		else:
-			# Fallback for dream mode
-			self.character_posx = 80
-			self.character_posy = self.imgH - 320
+
+			# For dynamic layout, create character on transparent canvas matching current dimensions
+			# instead of using fixed-size bigbase
+			if self.verb != 'dream':
+				# Create transparent canvas matching the current image dimensions
+				base_canvas = Image.new('RGBA', (self.imgW, self.imgH), (255, 255, 255, 0))
+				character = Image.open(self.characterpic).convert('RGBA')
+				base_canvas.paste(character, (self.character_posx, self.character_posy), character)
+				base_canvas.save(self.imagefile)
+				return
+
+		# Fallback for dream mode - use old method
+		self.character_posx = 80
+		self.character_posy = self.imgH - 320
 		myimage = combine_sources(self.character_posx, self.character_posy, self.bigbase, self.characterpic, self.imagefile)
 
 	def build_popup(self):
@@ -427,52 +503,65 @@ class Puppet():
 
 		# Overlay character onto the balloon canvas
 		if self.verb != 'dream':
-			myimage = combine_sources(self.character_posx, self.character_posy, self.combo, self.imagefile, self.combo)
+			# Character is already positioned in self.imagefile at the correct coordinates
+			# So composite at (0, 0) to preserve the positioning
+			myimage = combine_sources(0, 0, self.combo, self.imagefile, self.combo)
 		else:
 			myimage = combine_sources(self.origx, self.origy, self.imagefile, self.baloon, self.combo)
 
 		# draw text
-		img = Image.open(self.combo)
+		img = Image.open(self.combo).convert('RGBA')
 		draw = ImageDraw.Draw(img)
 		font = ImageFont.truetype(self.fontfile, 15)
 
-		# Draw curved tail on top of character (for 'say' mode)
+		# Draw curved tail on top of character (for 'say' mode) using SVG
 		if hasattr(self, 'tail_data') and self.tail_data:
-			import math
 			tail = self.tail_data
 
+			attach1 = tail['attach1']
+			attach2 = tail['attach2']
 			tip = tail['tip']
-			top_attach = tail['top_attach']
-			bottom_attach = tail['bottom_attach']
+			ctrl1 = tail['ctrl1']
+			ctrl2 = tail['ctrl2']
 
-			# Create smooth curved tail
-			curved_points = []
+			# Build SVG path for the tail using quadratic bezier curves
+			# M = move to attach1, q = curve to tip, q = curve to attach2, Z = close path
+			ctrl1_rel_x = ctrl1[0] - attach1[0]
+			ctrl1_rel_y = ctrl1[1] - attach1[1]
+			tip_rel_x = tip[0] - attach1[0]
+			tip_rel_y = tip[1] - attach1[1]
 
-			# Top curve: from top attachment point to tip
-			num_points = 12
-			for i in range(num_points + 1):
-				t = i / num_points
-				# Quadratic bezier with control point offset to create curve
-				ctrl_x = (top_attach[0] + tip[0]) / 2 - 15
-				ctrl_y = (top_attach[1] + tip[1]) / 2
+			ctrl2_rel_x = ctrl2[0] - tip[0]
+			ctrl2_rel_y = ctrl2[1] - tip[1]
+			attach2_rel_x = attach2[0] - tip[0]
+			attach2_rel_y = attach2[1] - tip[1]
 
-				x = (1-t)**2 * top_attach[0] + 2*(1-t)*t * ctrl_x + t**2 * tip[0]
-				y = (1-t)**2 * top_attach[1] + 2*(1-t)*t * ctrl_y + t**2 * tip[1]
-				curved_points.append((x, y))
+			# Build tail SVG with separate fill and stroke
+			# Fill: closed path with all three sides
+			# Stroke: only the outer two curves (not the attachment line)
+			tail_svg = f'''<svg width="{img.width}" height="{img.height}" xmlns="http://www.w3.org/2000/svg">
+			  <!-- Filled tail shape -->
+			  <path d="M {attach1[0]:.1f},{attach1[1]:.1f} q {ctrl1_rel_x:.1f},{ctrl1_rel_y:.1f} {tip_rel_x:.1f},{tip_rel_y:.1f} q {ctrl2_rel_x:.1f},{ctrl2_rel_y:.1f} {attach2_rel_x:.1f},{attach2_rel_y:.1f} Z" fill="#fff" stroke="none"/>
+			  <!-- Stroke only on outer edges (not attachment) -->
+			  <path d="M {attach1[0]:.1f},{attach1[1]:.1f} q {ctrl1_rel_x:.1f},{ctrl1_rel_y:.1f} {tip_rel_x:.1f},{tip_rel_y:.1f} q {ctrl2_rel_x:.1f},{ctrl2_rel_y:.1f} {attach2_rel_x:.1f},{attach2_rel_y:.1f}" fill="none" stroke="#000" stroke-width="3"/>
+			</svg>'''
 
-			# Bottom curve: from tip back to bottom attachment point
-			for i in range(num_points, -1, -1):
-				t = i / num_points
-				ctrl_x = (bottom_attach[0] + tip[0]) / 2 - 15
-				ctrl_y = (bottom_attach[1] + tip[1]) / 2
+			# Debug: save the SVG to see what's being generated
+			# with open('/tmp/debug_tail.svg', 'w') as f:
+			#     f.write(tail_svg)
 
-				x = (1-t)**2 * tip[0] + 2*(1-t)*t * ctrl_x + t**2 * bottom_attach[0]
-				y = (1-t)**2 * tip[1] + 2*(1-t)*t * ctrl_y + t**2 * bottom_attach[1]
-				curved_points.append((x, y))
+			# Convert tail SVG to PNG
+			try:
+				tail_png_data = cairosvg.svg2png(bytestring=tail_svg.encode('utf-8'))
+				tail_layer = Image.open(io.BytesIO(tail_png_data))
 
-			# Draw the curved tail
-			draw.polygon(curved_points, fill='white', outline='black', width=2)
-			draw.polygon(curved_points, fill='white')
+				# Composite the tail onto the main image
+				img = Image.alpha_composite(img, tail_layer)
+
+				# Recreate draw object since img was replaced
+				draw = ImageDraw.Draw(img)
+			except Exception as e:
+				print(f"Error converting tail SVG: {e}")
 
 		# Draw thought bubbles on top of character (for 'think' mode)
 		if hasattr(self, 'thought_bubbles') and self.thought_bubbles:

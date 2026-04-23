@@ -33,11 +33,12 @@ parser.add_argument('-a', '--action', action="store", default="say", help="actio
 parser.add_argument('-d', '--dream', action="store", default="images/sheep.png", help="path to dream image")
 parser.add_argument('-c', '--character', action="store", default="snake", help="character name")
 parser.add_argument('-i', '--ink', action="store", default='black', help="ink color (black, red, blue, green)")
+parser.add_argument('-p', '--placement', action="store", default='random', choices=['left', 'right', 'random'], help="bubble placement: left, right, or random (default: random)")
 
 args = parser.parse_args()
 
 # Convert ink color from string to tuple if needed
 ink_color = color_map.get(args.ink, black)
 
-xkaa.Puppet(character=args.character, verb=args.action, text=args.text, dreamed=args.dream, font="BonvenoCF-Light.otf", fontcolor=ink_color)
+xkaa.Puppet(character=args.character, verb=args.action, text=args.text, dreamed=args.dream, font="BonvenoCF-Light.otf", fontcolor=ink_color, placement=args.placement)
 
