@@ -30,15 +30,22 @@ color_map = {
 parser = argparse.ArgumentParser(description='xKaa - A fun character speech bubble display')
 parser.add_argument('-t', '--text', action="store", default="Hello World! Use -h for help", help="Your text")
 parser.add_argument('-a', '--action', action="store", default="say", help="action can be: say, shout, think or dream")
-parser.add_argument('-d', '--dream', action="store", default="images/sheep.png", help="path to dream image")
+parser.add_argument('-d', '--dream', action="store", default="images/baloo.png", help="path to dream image")
 parser.add_argument('-c', '--character', action="store", default="kaa", help="character name")
 parser.add_argument('-i', '--ink', action="store", default='black', help="ink color (black, red, blue, green)")
 parser.add_argument('-p', '--placement', action="store", default='random', choices=['left', 'right', 'random'], help="bubble placement: left, right, or random (default: random)")
+parser.add_argument('-l', '--legacy', action="store_true", help="use legacy character images from images/legacy/")
+parser.add_argument('-s', '--sleep', action="store", type=int, default=None, help="automatically close after XX seconds")
 
 args = parser.parse_args()
 
 # Convert ink color from string to tuple if needed
 ink_color = color_map.get(args.ink, black)
+
+# Handle legacy character path
+character_name = args.character
+if args.legacy:
+	character_name = f"legacy/{character_name}"
 
 # Handle dream image path
 # If user provides just a name (e.g., "barong"), convert to full path
@@ -50,5 +57,5 @@ if dream_path and not dream_path.startswith('images/') and not dream_path.starts
 	else:
 		dream_path = f"images/{dream_path}"
 
-xkaa.Puppet(character=args.character, verb=args.action, text=args.text, dreamed=dream_path, font="BonvenoCF-Light.otf", fontcolor=ink_color, placement=args.placement)
+xkaa.Puppet(character=character_name, verb=args.action, text=args.text, dreamed=dream_path, font="BonvenoCF-Light.otf", fontcolor=ink_color, placement=args.placement, auto_close=args.sleep)
 

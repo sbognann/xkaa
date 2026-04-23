@@ -38,7 +38,7 @@ __author__ = "Salvatore Bognanni <salvo AT unixyouth DOT COM>"
 
 import gi
 gi.require_version('Gtk', '4.0')
-from gi.repository import Gtk, Gdk, GdkPixbuf
+from gi.repository import Gtk, Gdk, GdkPixbuf, GLib
 import sys
 import os
 from PIL import ImageFont
@@ -71,7 +71,7 @@ def combine_sources(posx, posy, img1, img2, final):
 
 class Puppet():
 
-	def __init__(self, character=None, verb=None, text=None, dreamed=None, font=None, fontcolor=(0, 0, 0), placement='random'):
+	def __init__(self, character=None, verb=None, text=None, dreamed=None, font=None, fontcolor=(0, 0, 0), placement='random', auto_close=None):
 
 		self.imgW = 640
 		self.imgH = 520
@@ -92,6 +92,19 @@ class Puppet():
 		self.dreamed = dreamed
 		self.fontcolor = fontcolor
 		self.placement = placement
+		self.auto_close = auto_close
+
+		# Check if character image exists
+		if not os.path.exists(self.characterpic):
+			print(f"Error: Character image '{self.characterpic}' not found.")
+			print(f"Please check that the character '{character}' exists in the images directory.")
+			sys.exit(1)
+
+		# Check if dream image exists (when in dream mode)
+		if verb == 'dream' and dreamed and not os.path.exists(dreamed):
+			print(f"Error: Dream image '{dreamed}' not found.")
+			print(f"Please provide a valid path to a dream image.")
+			sys.exit(1)
 
 		self.verb = verb
 		self.text = text
@@ -823,6 +836,10 @@ class Puppet():
 		# Show the window
 		self.window.present()
 
+		# Set up auto-close timer if specified
+		if self.auto_close is not None:
+			GLib.timeout_add_seconds(self.auto_close, self.auto_close_window)
+
 	def on_drag_begin(self, gesture, x, y):
 		"""Start dragging the window"""
 		self.drag_started = False
@@ -842,6 +859,11 @@ class Puppet():
 		"""Handle drag end"""
 		# Reset drag state
 		self.drag_started = False
+
+	def auto_close_window(self):
+		"""Automatically close window after timeout"""
+		self.window.close()
+		return False  # Stop the timer
 
 	def on_right_click(self, gesture, n_press, x, y):
 		"""Close window on right click"""
