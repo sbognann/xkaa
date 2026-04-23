@@ -122,7 +122,9 @@ class Puppet():
 		# Create a temporary image to measure text
 		temp_img = Image.new('RGBA', (1, 1))
 		draw = ImageDraw.Draw(temp_img)
-		font = ImageFont.truetype(self.fontfile, 15)
+
+		# Start with default font size
+		font_size = 15
 
 		# Try different wrapping widths to find optimal layout
 		# Start with reasonable character count and adjust based on text length
@@ -139,8 +141,24 @@ class Puppet():
 		else:
 			wrap_width = 45
 
-		# Wrap text and calculate required dimensions
+		# Wrap text and check line count
 		lines = textwrap.wrap(self.text, width=wrap_width)
+		line_count = len(lines)
+
+		# Shrink font if more than 5 lines
+		if line_count > 5:
+			if line_count <= 8:
+				font_size = 13
+			elif line_count <= 12:
+				font_size = 11
+			else:
+				font_size = 10
+
+		# Store font size for later use
+		self.font_size = font_size
+		font = ImageFont.truetype(self.fontfile, font_size)
+
+		# Calculate required dimensions with the chosen font size
 		total_height = 0
 		max_width = 0
 
@@ -512,7 +530,9 @@ class Puppet():
 		# draw text
 		img = Image.open(self.combo).convert('RGBA')
 		draw = ImageDraw.Draw(img)
-		font = ImageFont.truetype(self.fontfile, 15)
+		# Use the font size calculated in calculate_text_size(), or default to 15
+		font_size = getattr(self, 'font_size', 15)
+		font = ImageFont.truetype(self.fontfile, font_size)
 
 		# Draw curved tail on top of character (for 'say' mode) using SVG
 		if hasattr(self, 'tail_data') and self.tail_data:
@@ -607,14 +627,17 @@ class Puppet():
 
 			# Calculate text area position
 			text_padding = 15
-			y_text_start = self.origy + self.textY
-			x_text_start = self.origx + self.textX
+
+			# textX and textY point to where the text_area (including padding) should start
+			text_area_x = self.origx + self.textX
+			text_area_y = self.origy + self.textY
 
 			# Draw light yellow rectangular background for text area
-			text_bg_x1 = x_text_start - text_padding
-			text_bg_y1 = y_text_start - text_padding
-			text_bg_x2 = text_bg_x1 + self.text_area_width
-			text_bg_y2 = text_bg_y1 + self.text_area_height
+			# The background should be exactly the text_area size
+			text_bg_x1 = text_area_x
+			text_bg_y1 = text_area_y
+			text_bg_x2 = text_area_x + self.text_area_width
+			text_bg_y2 = text_area_y + self.text_area_height
 
 			# Light yellow color for note/page effect
 			yellow_bg = (255, 255, 224, 230)  # Light yellow with slight transparency
@@ -625,9 +648,9 @@ class Puppet():
 				width=1
 			)
 
-			# Draw text on top of yellow background
-			y_text = y_text_start
-			x_text = x_text_start
+			# Draw text inside the padded area (text starts at padding offset from area edge)
+			y_text = text_area_y + text_padding
+			x_text = text_area_x + text_padding
 			for line in lines:
 				bbox = draw.textbbox((x_text, y_text), line, font=font)
 				width = bbox[2] - bbox[0]
