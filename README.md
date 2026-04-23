@@ -13,8 +13,8 @@ Display fun character speech bubbles on your desktop with custom text, dynamic s
 - **SVG-rendered tails** with smooth, organic curved shapes
 - **Multiple balloon styles**: say, shout, think, dream
 - **Flexible bubble placement**: left, right, or random positioning
-- **Multiple characters**: kaa, donkey, chicken, bat, and more
-- **Legacy character support**: access classic character images with `-l` flag
+- **Multiple characters**: kaa, baloo, bagheera, sherekhan, and more
+- **Legacy character support**: access classic character images with `-l` flag : donkey, snake, chicken, cow
 - **Customizable text colors**: black, red, blue, green
 - **Auto-close timer**: automatically dismiss after a set duration
 - **Interactive**: drag to move, click to close
@@ -74,7 +74,7 @@ xkaasay -c kaa -a say -t "Hello World!" -i blue -p right
 
 - `-t, --text TEXT` : Text to display (default: "Hello World! Use -h for help")
 - `-a, --action ACTION` : Balloon type - say, shout, think, or dream (default: say)
-- `-c, --character CHARACTER` : Character name - kaa, donkey, chicken, bat, etc. (default: kaa)
+- `-c, --character CHARACTER` : Character name - kaa, baloo, baghera, akela, etc. (default: kaa)
 - `-i, --ink COLOR` : Text ink color - black, red, blue, green (default: black)
 - `-p, --placement POSITION` : Bubble placement - left, right, or random (default: random)
 - `-d, --dream IMAGE` : Path to dream image for dream action (default: images/baloo.png)
@@ -91,12 +91,12 @@ xkaasay -t "Hello!"
 
 Bubble on the right with blue text:
 ```bash
-xkaasay -c donkey -t "Welcome to xKaa!" -i blue -p right
+xkaasay -c bagheera -t "Welcome to xKaa!" -i blue -p right
 ```
 
 Thought bubble:
 ```bash
-xkaasay -c chicken -a think -t "What should I code today?"
+xkaasay -l -c chicken -a think -t "What should I code today?"
 ```
 
 Dream bubble with default image (baloo):
@@ -106,7 +106,7 @@ xkaasay -a dream
 
 Dream bubble with custom image:
 ```bash
-xkaasay -c bat -a dream -d /path/to/image.png
+xkaasay -c sherekhan -a dream -d /path/to/image.png
 ```
 
 Use legacy character images:
@@ -129,13 +129,20 @@ xkaasay -t "This will disappear in 5 seconds" -s 5
 
 The `images/` directory contains various characters. Common ones include:
 - kaa (default)
-- donkey  
-- chicken
-- bat
+- bagheera  
 - baloo
+- akela
+- sherekhan
 - And more!
 
 Legacy characters from the original xcowsay are available in `images/legacy/` and can be accessed using the `-l` flag.
+
+- snake
+- chicken  
+- cow
+- bat
+- tiger
+- And more!
 
 ## How It Works
 
@@ -143,10 +150,10 @@ xKaa creates beautiful speech bubbles using SVG path rendering with quadratic Be
 
 ## License
 
-Free software - character icons from Animal Icons collection by Martin Berube
+Free software - legacy character icons from Animal Icons collection by Martin Berube
 http://www.softicons.com/animal-icons/animal-icons-by-martin-berube
 
 ## Credits
 
 Inspired by xcowsay (http://www.doof.me.uk/xcowsay/)
-Python rework by Salvatore Bognanni
+Python rework by Salvatore Bognanni and AI
