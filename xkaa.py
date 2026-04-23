@@ -732,10 +732,8 @@ class Puppet():
 			self.drag_started = True
 
 	def on_drag_end(self, gesture, offset_x, offset_y):
-		"""Handle drag end - close if it was just a click"""
-		if not self.drag_started:
-			# It was just a click, not a drag - close the window
-			self.window.close()
+		"""Handle drag end"""
+		# Reset drag state
 		self.drag_started = False
 
 	def on_right_click(self, gesture, n_press, x, y):
