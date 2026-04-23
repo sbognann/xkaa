@@ -195,19 +195,29 @@ class Puppet():
 		return self.balloon_width, self.balloon_height
 
 	def make_dream(self):
-		# combine images together
-		scalefactor = 1
-		posx = 80
-		posy = 65
-		width = 128
+		"""Add dream image to the balloon - now works with dynamic layout"""
+		# Calculate image size based on balloon size
+		# Dream image should fit nicely inside the balloon
+		max_image_width = int(self.balloon_width * 0.5)
+		max_image_height = int(self.balloon_height * 0.5)
 
 		# Load and resize the dreamed image
-		pixbuf = Image.open(self.dreamed)
-		pixbuf.thumbnail((width // scalefactor, width // scalefactor), Image.LANCZOS)
-		pixbuf.save(self.minidream, 'PNG')
+		dream_img = Image.open(self.dreamed).convert('RGBA')
+		dream_img.thumbnail((max_image_width, max_image_height), Image.LANCZOS)
 
-		myimage = combine_sources(posx, posy, self.balloonbase, self.minidream, self.dreamballoon)
-		return self.dreamballoon
+		# Calculate position to center the dream image in the balloon
+		balloon_center_x = self.balloon_left + self.balloon_width / 2
+		balloon_center_y = self.balloon_top + self.balloon_height / 2
+
+		image_x = int(balloon_center_x - dream_img.width / 2)
+		image_y = int(balloon_center_y - dream_img.height / 2)
+
+		# Store position for later compositing
+		self.dream_image_x = image_x
+		self.dream_image_y = image_y
+		self.dream_image = dream_img
+
+		return self.balloonbase
 
 	def create_svg_speech_bubble(self, width, height, tail_x, tail_y, bubble_side='right'):
 		"""Create SVG speech bubble (just the bubble) and return tail data separately"""
@@ -419,19 +429,41 @@ class Puppet():
 			draw.ellipse((balloon_left, balloon_top, balloon_right, balloon_bottom), fill='white', outline='black')
 
 			# Thought bubble circles - dynamically connect to character's head
-			# Position on RIGHT side of character's head (facing balloon)
-			character_head_right_x = self.character_x + 200
-			character_head_right_y = character_head_y + 60
+			# Position thought bubbles to connect from character's head to the balloon
+			# Character head position
+			if bubble_side == 'right':
+				# Bubble on right, character on left - connect from right side of head
+				character_head_x = self.character_x + 200
+			else:
+				# Bubble on left, character on right - connect from left side of head
+				character_head_x = self.character_x + 50
+			character_head_y = character_head_y + 60
+
+			# Calculate connection point on the balloon (closest edge to character)
+			if bubble_side == 'right':
+				# Balloon is to the right, connect to left edge of balloon
+				balloon_edge_x = balloon_left
+			else:
+				# Balloon is to the left, connect to right edge of balloon
+				balloon_edge_x = balloon_right
+
+			balloon_edge_y = balloon_top + self.balloon_height * 0.6
 
 			# Position bubbles in a path from character to balloon
-			# Calculate positions between character and balloon
-			mid_x = (balloon_left + character_head_right_x) / 2
-			mid_y = (balloon_top + self.balloon_height * 0.6 + character_head_right_y) / 2
+			# Small bubble near character head
+			small_bubble_x = character_head_x + (15 if bubble_side == 'right' else -15)
+			small_bubble_y = character_head_y
+			small_radius = 8
+
+			# Medium bubble midway
+			mid_x = (balloon_edge_x + character_head_x) / 2
+			mid_y = (balloon_edge_y + character_head_y) / 2
+			med_radius = 15
 
 			# Store bubble positions to draw AFTER character is composited
 			self.thought_bubbles = [
-				(mid_x - 20, mid_y - 10, mid_x + 20, mid_y + 30),  # Larger bubble midway
-				(character_head_right_x + 5, character_head_right_y - 10, character_head_right_x + 20, character_head_right_y + 5)  # Smaller bubble near character
+				(mid_x - med_radius, mid_y - med_radius, mid_x + med_radius, mid_y + med_radius),  # Medium bubble midway
+				(small_bubble_x - small_radius, small_bubble_y - small_radius, small_bubble_x + small_radius, small_bubble_y + small_radius)  # Small bubble near character
 			]
 		elif self.balloontype == 'shout':
 			# Scale shout polygon based on balloon size
@@ -456,46 +488,33 @@ class Puppet():
 
 	def draw_base(self):
 		# Use character position calculated in draw_balloons
-		# Character is positioned on the left side
 		if hasattr(self, 'character_x') and hasattr(self, 'character_y'):
 			self.character_posx = self.character_x
 			self.character_posy = self.character_y
 
-			# For dynamic layout, create character on transparent canvas matching current dimensions
-			# instead of using fixed-size bigbase
-			if self.verb != 'dream':
-				# Create transparent canvas matching the current image dimensions
-				base_canvas = Image.new('RGBA', (self.imgW, self.imgH), (255, 255, 255, 0))
-				character = Image.open(self.characterpic).convert('RGBA')
-				base_canvas.paste(character, (self.character_posx, self.character_posy), character)
-				base_canvas.save(self.imagefile)
-				return
-
-		# Fallback for dream mode - use old method
-		self.character_posx = 80
-		self.character_posy = self.imgH - 320
-		myimage = combine_sources(self.character_posx, self.character_posy, self.bigbase, self.characterpic, self.imagefile)
+			# Create transparent canvas matching the current image dimensions
+			base_canvas = Image.new('RGBA', (self.imgW, self.imgH), (255, 255, 255, 0))
+			character = Image.open(self.characterpic).convert('RGBA')
+			base_canvas.paste(character, (self.character_posx, self.character_posy), character)
+			base_canvas.save(self.imagefile)
 
 	def build_popup(self):
 
 		# Draw the balloon (which calculates layout and creates full canvas with balloon)
 		self.baloon = self.draw_balloons(balloontype=self.verb)
 
-		# For dream mode, use old positioning
+		# For dream mode, prepare the dream image
 		if self.verb == 'dream':
 			self.baloon = self.make_dream()
-			self.origx = 220
-			self.origy = 0
-			balloon_offset_x = 220
-		else:
-			# The balloon is already drawn on the full canvas at the correct position
-			# We just need to overlay the character
-			# Position for overlaying is (0, 0) since balloon canvas is already full size
-			self.origx = 0
-			self.origy = 0
 
-		# Calculate centered position for text box within balloon
-		if hasattr(self, 'text_area_width') and hasattr(self, 'text_area_height') and hasattr(self, 'balloon_left'):
+		# The balloon is already drawn on the full canvas at the correct position
+		# We just need to overlay the character
+		# Position for overlaying is (0, 0) since balloon canvas is already full size
+		self.origx = 0
+		self.origy = 0
+
+		# Calculate centered position for text box within balloon (not used for dream mode)
+		if self.verb != 'dream' and hasattr(self, 'text_area_width') and hasattr(self, 'text_area_height') and hasattr(self, 'balloon_left'):
 			# Calculate the center of the elliptical balloon
 			balloon_center_x = self.balloon_left + self.balloon_width / 2
 			balloon_center_y = self.balloon_top + self.balloon_height / 2
@@ -504,10 +523,6 @@ class Puppet():
 			# The text box starts at center minus half its width/height
 			self.textX = balloon_center_x - self.text_area_width / 2
 			self.textY = balloon_center_y - self.text_area_height / 2
-		else:
-			# Fallback for dream mode
-			self.textX = 40
-			self.textY = 35
 
 		# Create base image for character
 		self.combo = "images/output.png"
@@ -520,12 +535,9 @@ class Puppet():
 		self.draw_base()
 
 		# Overlay character onto the balloon canvas
-		if self.verb != 'dream':
-			# Character is already positioned in self.imagefile at the correct coordinates
-			# So composite at (0, 0) to preserve the positioning
-			myimage = combine_sources(0, 0, self.combo, self.imagefile, self.combo)
-		else:
-			myimage = combine_sources(self.origx, self.origy, self.imagefile, self.baloon, self.combo)
+		# Character is already positioned in self.imagefile at the correct coordinates
+		# So composite at (0, 0) to preserve the positioning
+		myimage = combine_sources(0, 0, self.combo, self.imagefile, self.combo)
 
 		# draw text
 		img = Image.open(self.combo).convert('RGBA')
@@ -612,12 +624,18 @@ class Puppet():
 			except Exception as e:
 				print(f"Error converting tail SVG: {e}")
 
-		# Draw thought bubbles on top of character (for 'think' mode)
+		# Draw thought bubbles on top of character (for 'think' and 'dream' modes)
 		if hasattr(self, 'thought_bubbles') and self.thought_bubbles:
 			for bubble_coords in self.thought_bubbles:
 				draw.ellipse(bubble_coords, fill='white', outline='black')
 
-		if self.baloon != self.dreamballoon:
+		# For dream mode, composite the dream image onto the balloon
+		if self.verb == 'dream' and hasattr(self, 'dream_image'):
+			img.paste(self.dream_image, (self.dream_image_x, self.dream_image_y), self.dream_image)
+			# Recreate draw object since we modified img
+			draw = ImageDraw.Draw(img)
+
+		if self.verb != 'dream':
 			# Use pre-calculated text lines from calculate_text_size
 			if hasattr(self, 'text_lines'):
 				lines = self.text_lines
