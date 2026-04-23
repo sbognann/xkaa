@@ -1,7 +1,7 @@
 xkaa
 ====
 
-A Python 3 rework of xcowsay (http://www.doof.me.uk/xcowsay/). The name is inspired by Kaa, the python from 'The Jungle Book'. The x is for X-window. It also should sound close to xcow.
+A Python 3 rework of xcowsay (http://www.doof.me.uk/xcowsay/). The name is inspired by Kaa, the python from 'The Jungle Book'. The x is for X-window, but it also works in Wayland. It also should sound close to 'xcow'.
 
 Display fun character speech bubbles on your desktop with custom text, dynamic sizing, and organic SVG-rendered speech bubble tails!
 
