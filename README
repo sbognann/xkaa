@@ -1,10 +1,12 @@
+![Example Image](xkaasay.png)
+
 Just an attempt to rewrite xcow using python. Kaa is the python in the Jungle Book
 and it also sounds a bit like xcow from xcowsay.
 
 The snake (and the other animals) image is a freeware from Martin Berube and it was
 taken from http://www.softicons.com/animal-icons/animal-icons-by-martin-berube/snake-icon
 
-the default font comes from : http://openfontlibrary.org/en/font/benveno
+the default font comes from : http://openfontlibrary.org/en/:font/benveno
 
 INSTALLATION
 ============
