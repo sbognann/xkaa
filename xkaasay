@@ -40,5 +40,15 @@ args = parser.parse_args()
 # Convert ink color from string to tuple if needed
 ink_color = color_map.get(args.ink, black)
 
-xkaa.Puppet(character=args.character, verb=args.action, text=args.text, dreamed=args.dream, font="BonvenoCF-Light.otf", fontcolor=ink_color, placement=args.placement)
+# Handle dream image path
+# If user provides just a name (e.g., "barong"), convert to full path
+dream_path = args.dream
+if dream_path and not dream_path.startswith('images/') and not dream_path.startswith('/'):
+	# User provided just a name, add images/ prefix and .png if needed
+	if not dream_path.endswith('.png'):
+		dream_path = f"images/{dream_path}.png"
+	else:
+		dream_path = f"images/{dream_path}"
+
+xkaa.Puppet(character=args.character, verb=args.action, text=args.text, dreamed=dream_path, font="BonvenoCF-Light.otf", fontcolor=ink_color, placement=args.placement)
 
