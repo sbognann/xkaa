@@ -78,7 +78,14 @@ class Puppet():
 		self.character = character
 		self.font = font
 		self.imgdir = imgdir
-		self.imagefile = os.path.join(self.imgdir, 'ab' + self.character + ".png")
+
+		# Handle subdirectory in character name (e.g., "legacy/chicken")
+		if '/' in self.character:
+			char_dir, char_name = os.path.split(self.character)
+			self.imagefile = os.path.join(self.imgdir, char_dir, 'ab' + char_name + ".png")
+		else:
+			self.imagefile = os.path.join(self.imgdir, 'ab' + self.character + ".png")
+
 		self.characterpic = os.path.join(self.imgdir, self.character + ".png")
 		self.dreamballoon = os.path.join(self.imgdir, "dream.png")
 		self.dreambase = os.path.join(self.imgdir, "dreambase.png")
