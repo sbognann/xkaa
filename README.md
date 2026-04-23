@@ -13,8 +13,10 @@ Display fun character speech bubbles on your desktop with custom text, dynamic s
 - **SVG-rendered tails** with smooth, organic curved shapes
 - **Multiple balloon styles**: say, shout, think, dream
 - **Flexible bubble placement**: left, right, or random positioning
-- **Multiple characters**: snake, donkey, chicken, bat, and more
+- **Multiple characters**: kaa, donkey, chicken, bat, and more
+- **Legacy character support**: access classic character images with `-l` flag
 - **Customizable text colors**: black, red, blue, green
+- **Auto-close timer**: automatically dismiss after a set duration
 - **Interactive**: drag to move, click to close
 
 ## Requirements
@@ -65,24 +67,26 @@ See [BUILD_RPM.md](BUILD_RPM.md) for detailed instructions.
 ## Usage
 
 ```bash
-xkaasay -c snake -a say -t "Hello World!" -i blue -p right
+xkaasay -c kaa -a say -t "Hello World!" -i blue -p right
 ```
 
 ### Command Line Options
 
 - `-t, --text TEXT` : Text to display (default: "Hello World! Use -h for help")
 - `-a, --action ACTION` : Balloon type - say, shout, think, or dream (default: say)
-- `-c, --character CHARACTER` : Character name - snake, donkey, chicken, bat, etc. (default: snake)
+- `-c, --character CHARACTER` : Character name - kaa, donkey, chicken, bat, etc. (default: kaa)
 - `-i, --ink COLOR` : Text ink color - black, red, blue, green (default: black)
 - `-p, --placement POSITION` : Bubble placement - left, right, or random (default: random)
-- `-d, --dream IMAGE` : Path to dream image for dream action (default: images/sheep.png)
+- `-d, --dream IMAGE` : Path to dream image for dream action (default: images/baloo.png)
+- `-l, --legacy` : Use legacy character images from images/legacy/ directory
+- `-s, --sleep SECONDS` : Automatically close after specified number of seconds
 - `-h, --help` : Show help message
 
 ### Examples
 
-Simple greeting:
+Simple greeting with default character (kaa):
 ```bash
-xkaasay -c snake -t "Hello!"
+xkaasay -t "Hello!"
 ```
 
 Bubble on the right with blue text:
@@ -95,24 +99,43 @@ Thought bubble:
 xkaasay -c chicken -a think -t "What should I code today?"
 ```
 
-Dream bubble:
+Dream bubble with default image (baloo):
+```bash
+xkaasay -a dream
+```
+
+Dream bubble with custom image:
 ```bash
 xkaasay -c bat -a dream -d /path/to/image.png
+```
+
+Use legacy character images:
+```bash
+xkaasay -l -c snake -t "Classic snake!"
+```
+
+Auto-close after 5 seconds:
+```bash
+xkaasay -t "This will disappear in 5 seconds" -s 5
 ```
 
 ### Interactive Controls
 
 - **Left click and drag**: Move the window around the screen
 - **Right click or ESC**: Close the window
+- **Auto-close**: Use `-s SECONDS` to automatically close after a specified duration
 
 ## Available Characters
 
 The `images/` directory contains various characters. Common ones include:
-- snake
+- kaa (default)
 - donkey  
 - chicken
 - bat
+- baloo
 - And more!
+
+Legacy characters from the original xcowsay are available in `images/legacy/` and can be accessed using the `-l` flag.
 
 ## How It Works
 
