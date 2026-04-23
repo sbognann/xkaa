@@ -536,14 +536,43 @@ class Puppet():
 			attach2_rel_x = attach2[0] - tip[0]
 			attach2_rel_y = attach2[1] - tip[1]
 
-			# Build tail SVG with separate fill and stroke
-			# Fill: closed path with all three sides
-			# Stroke: only the outer two curves (not the attachment line)
+			# Calculate points on the bubble edge for the stroke
+			import math
+
+			# Get bubble center and dimensions
+			bubble_cx = self.balloon_left + self.balloon_width / 2
+			bubble_cy = self.balloon_top + self.balloon_height / 2
+			bubble_rx = self.balloon_width / 2 - 10
+			bubble_ry = self.balloon_height / 2 - 10
+
+			# Find where the tail meets the bubble edge
+			# Calculate angle from bubble center to tip
+			tail_angle = math.atan2(tip[1] - bubble_cy, tip[0] - bubble_cx)
+
+			# Points on the ellipse edge where stroke should start
+			edge_center_x = bubble_cx + bubble_rx * math.cos(tail_angle)
+			edge_center_y = bubble_cy + bubble_ry * math.sin(tail_angle)
+
+			# Perpendicular spread
+			tail_spread = 35
+			perp_angle = tail_angle + math.pi / 2
+
+			stroke_start1_x = edge_center_x + tail_spread * math.cos(perp_angle)
+			stroke_start1_y = edge_center_y + tail_spread * math.sin(perp_angle)
+			stroke_start2_x = edge_center_x - tail_spread * math.cos(perp_angle)
+			stroke_start2_y = edge_center_y - tail_spread * math.sin(perp_angle)
+
+			# Build tail SVG using a white-filled ellipse to hide stroke inside bubble
+			# This approach: draw the full stroke, then cover the inside part
 			tail_svg = f'''<svg width="{img.width}" height="{img.height}" xmlns="http://www.w3.org/2000/svg">
-			  <!-- Filled tail shape -->
+			  <!-- Filled tail shape (deep inside for seamless connection) -->
 			  <path d="M {attach1[0]:.1f},{attach1[1]:.1f} q {ctrl1_rel_x:.1f},{ctrl1_rel_y:.1f} {tip_rel_x:.1f},{tip_rel_y:.1f} q {ctrl2_rel_x:.1f},{ctrl2_rel_y:.1f} {attach2_rel_x:.1f},{attach2_rel_y:.1f} Z" fill="#fff" stroke="none"/>
-			  <!-- Stroke only on outer edges (not attachment) -->
+
+			  <!-- Full stroke path (same as fill) -->
 			  <path d="M {attach1[0]:.1f},{attach1[1]:.1f} q {ctrl1_rel_x:.1f},{ctrl1_rel_y:.1f} {tip_rel_x:.1f},{tip_rel_y:.1f} q {ctrl2_rel_x:.1f},{ctrl2_rel_y:.1f} {attach2_rel_x:.1f},{attach2_rel_y:.1f}" fill="none" stroke="#000" stroke-width="3"/>
+
+			  <!-- White-filled ellipse to cover the stroke inside the bubble -->
+			  <ellipse cx="{bubble_cx}" cy="{bubble_cy}" rx="{bubble_rx - 1.5}" ry="{bubble_ry - 1.5}" fill="#fff" stroke="none"/>
 			</svg>'''
 
 			# Debug: save the SVG to see what's being generated
