@@ -31,7 +31,7 @@ parser = argparse.ArgumentParser(description='xKaa - A fun character speech bubb
 parser.add_argument('-t', '--text', action="store", default="Hello World! Use -h for help", help="Your text")
 parser.add_argument('-a', '--action', action="store", default="say", help="action can be: say, shout, think or dream")
 parser.add_argument('-d', '--dream', action="store", default="images/sheep.png", help="path to dream image")
-parser.add_argument('-c', '--character', action="store", default="snake", help="character name")
+parser.add_argument('-c', '--character', action="store", default="kaa", help="character name")
 parser.add_argument('-i', '--ink', action="store", default='black', help="ink color (black, red, blue, green)")
 parser.add_argument('-p', '--placement', action="store", default='random', choices=['left', 'right', 'random'], help="bubble placement: left, right, or random (default: random)")
 
