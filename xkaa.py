@@ -219,31 +219,132 @@ class Puppet():
 
 		return self.balloonbase
 
-	def create_svg_speech_bubble(self, width, height, tail_x, tail_y, bubble_side='right'):
+	def create_svg_speech_bubble(self, width, height, tail_x, tail_y, bubble_side='right', bubble_type='say'):
 		"""Create SVG speech bubble (just the bubble) and return tail data separately"""
 		import math
 
 		# Bubble dimensions
 		cx = width / 2
 		cy = height / 2
-		rx = width / 2 - 10
-		ry = height / 2 - 10
 
 		# Stroke widths following the blog post style
 		outer_stroke = 6  # Thicker outer border
 
-		# Create SVG with just the bubble (no tail)
-		svg = f'''<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg">
-		  <defs>
-		    <ellipse id="bubble" cx="{cx}" cy="{cy}" rx="{rx}" ry="{ry}"/>
-		  </defs>
+		if bubble_type == 'shout':
+			# Create a comic book style shout bubble with uniform triangular spikes
+			# Build an OVAL/ELLIPTICAL base with regular triangle spikes arranged in a circular pattern
+			# One spike acts as a "tail" pointing towards the character's mouth
 
-		  <!-- Outer border ellipse with thick stroke -->
-		  <use href="#bubble" fill="none" stroke="#000" stroke-width="{outer_stroke}"/>
+			svg_path = []
 
-		  <!-- Inner white ellipse -->
-		  <use href="#bubble" fill="#fff" stroke="none"/>
-		</svg>'''
+			# Spike parameters - proportional to bubble size (50% larger)
+			spike_height = min(width, height) * 0.225  # Spike height is 22.5% of smaller dimension
+
+			# Define the inner ellipse (where spike bases attach)
+			# Leave room for spikes to extend outward
+			padding = 10  # Minimal edge padding
+			base_rx = width / 2 - padding - spike_height
+			base_ry = height / 2 - padding - spike_height
+
+			# Calculate the angle towards the tail (character's mouth)
+			tail_angle = math.atan2(tail_y - cy, tail_x - cx)
+
+			# Number of triangular spikes around the perimeter
+			num_spikes = 16
+
+			# Create triangular spikes arranged in a circular pattern around the ellipse
+			for i in range(num_spikes):
+				# Each spike is defined by three angles:
+				# 1. Start angle (left edge of spike base)
+				# 2. Peak angle (tip of spike pointing outward)
+				# 3. End angle (right edge of spike base)
+
+				angle_start = (i * 2 * math.pi) / num_spikes
+				angle_peak = ((i + 0.5) * 2 * math.pi) / num_spikes
+				angle_end = ((i + 1) * 2 * math.pi) / num_spikes
+
+				# Check if this spike should be the "tail" (closest to tail_angle)
+				angle_diff = abs(((angle_peak - tail_angle + math.pi) % (2 * math.pi)) - math.pi)
+				is_tail_spike = angle_diff < (math.pi / num_spikes)
+
+				# Start point on base ellipse
+				x1 = cx + base_rx * math.cos(angle_start)
+				y1 = cy + base_ry * math.sin(angle_start)
+
+				# Peak point - for tail spike, point it towards the mouth (but limit extension)
+				if is_tail_spike:
+					# Point this spike towards the character's mouth
+					# But extend it only spike_height distance, not all the way to the mouth
+					tail_distance = math.sqrt((tail_x - cx)**2 + (tail_y - cy)**2)
+					if tail_distance > 0:
+						# Normalize the direction and extend by spike_height
+						direction_x = (tail_x - cx) / tail_distance
+						direction_y = (tail_y - cy) / tail_distance
+						# Extend from the base ellipse edge
+						base_edge_x = cx + base_rx * direction_x
+						base_edge_y = cy + base_ry * direction_y
+						x2_unclamped = base_edge_x + spike_height * 2.5 * direction_x  # Make tail 2.5x longer
+						y2_unclamped = base_edge_y + spike_height * 2.5 * direction_y
+
+						# Clamp the tail tip to stay within the SVG canvas bounds
+						margin_from_edge = 5  # Keep a small margin from edge
+						x2 = max(margin_from_edge, min(width - margin_from_edge, x2_unclamped))
+						y2 = max(margin_from_edge, min(height - margin_from_edge, y2_unclamped))
+					else:
+						# Fallback
+						peak_rx = base_rx + spike_height
+						peak_ry = base_ry + spike_height
+						x2 = cx + peak_rx * math.cos(angle_peak)
+						y2 = cy + peak_ry * math.sin(angle_peak)
+				else:
+					# Regular spike extending outward radially
+					peak_rx = base_rx + spike_height
+					peak_ry = base_ry + spike_height
+					x2 = cx + peak_rx * math.cos(angle_peak)
+					y2 = cy + peak_ry * math.sin(angle_peak)
+
+				# End point on base ellipse
+				x3 = cx + base_rx * math.cos(angle_end)
+				y3 = cy + base_ry * math.sin(angle_end)
+
+				if i == 0:
+					svg_path.append(f"M {x1:.1f},{y1:.1f}")
+
+				svg_path.append(f"L {x2:.1f},{y2:.1f}")
+				svg_path.append(f"L {x3:.1f},{y3:.1f}")
+
+			svg_path.append("Z")
+			path_data = " ".join(svg_path)
+
+			# Set rx/ry for tail calculation
+			rx = base_rx
+			ry = base_ry
+
+			# Create SVG with jagged shout bubble
+			svg = f'''<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg">
+			  <!-- White fill -->
+			  <path d="{path_data}" fill="#fff" stroke="none"/>
+
+			  <!-- Black border -->
+			  <path d="{path_data}" fill="none" stroke="#000" stroke-width="{outer_stroke}"/>
+			</svg>'''
+		else:
+			# For say mode - smooth ellipse
+			rx = width / 2 - 10
+			ry = height / 2 - 10
+
+			# Create SVG with just the bubble (no tail) - smooth ellipse for say mode
+			svg = f'''<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg">
+			  <defs>
+			    <ellipse id="bubble" cx="{cx}" cy="{cy}" rx="{rx}" ry="{ry}"/>
+			  </defs>
+
+			  <!-- Outer border ellipse with thick stroke -->
+			  <use href="#bubble" fill="none" stroke="#000" stroke-width="{outer_stroke}"/>
+
+			  <!-- Inner white ellipse -->
+			  <use href="#bubble" fill="#fff" stroke="none"/>
+			</svg>'''
 
 		# Calculate tail geometry to be drawn later (after character)
 		tail_angle = math.atan2(tail_y - cy, tail_x - cx)
@@ -314,7 +415,8 @@ class Puppet():
 		self.bubble_side = bubble_side
 
 		# Canvas dimensions depend on bubble position
-		gap_between = 20
+		# Reduce gap for shout mode since the tail extends towards the character
+		gap_between = -40 if self.balloontype == 'shout' else 20
 		canvas_width = margin + character_width + gap_between + self.balloon_width + margin
 
 		# Canvas height
@@ -350,7 +452,8 @@ class Puppet():
 		if bubble_side == 'right':
 			balloon_start_x = self.character_x + character_width + gap_between
 		else:
-			balloon_start_x = margin
+			# Balloon on left, character on right
+			balloon_start_x = self.character_x - gap_between - self.balloon_width
 
 		# Create base with dynamic size
 		base = Image.new('RGBA', (canvas_width, canvas_height), (255, 255, 255, 0))
@@ -375,8 +478,8 @@ class Puppet():
 		self.balloon_left = balloon_left
 		self.balloon_top = balloon_top
 
-		if self.balloontype == 'say':
-			# Generate SVG speech bubble with smooth curves
+		if self.balloontype == 'say' or self.balloontype == 'shout':
+			# Generate SVG speech bubble with smooth curves (say) or jagged edges (shout)
 			import math
 
 			# Character's mouth position (side facing the bubble)
@@ -398,7 +501,8 @@ class Puppet():
 				int(self.balloon_height),
 				tail_relative_x,
 				tail_relative_y,
-				bubble_side
+				bubble_side,
+				self.balloontype
 			)
 
 			# Convert SVG to PNG
@@ -409,7 +513,7 @@ class Puppet():
 				# Paste bubble onto canvas
 				base.paste(bubble_img, (int(balloon_left), int(balloon_top)), bubble_img)
 			except Exception as e:
-				print(f"Error converting SVG: {e}")
+				print(f"Error converting SVG for {self.balloontype}: {e}")
 				# Fallback to simple ellipse if SVG conversion fails
 				draw.ellipse((balloon_left, balloon_top, balloon_right, balloon_bottom), fill='white', outline='black')
 				tail_data = None
@@ -465,21 +569,6 @@ class Puppet():
 				(mid_x - med_radius, mid_y - med_radius, mid_x + med_radius, mid_y + med_radius),  # Medium bubble midway
 				(small_bubble_x - small_radius, small_bubble_y - small_radius, small_bubble_x + small_radius, small_bubble_y + small_radius)  # Small bubble near character
 			]
-		elif self.balloontype == 'shout':
-			# Scale shout polygon based on balloon size
-			scale_x = self.balloon_width / 260
-			scale_y = self.balloon_height / 200
-			shout_points = [
-				(3, 237), (29, 183), (46, 206), (56, 156),
-				(12, 170), (36, 131), (3, 111), (38, 96),
-				(8, 70), (51, 62), (25, 22), (85, 38), (120, 9),
-				(147, 42), (191, 19), (201, 57), (252, 47), (249, 88),
-				(282, 120), (235, 137), (260, 172), (210, 178),
-				(233, 218), (170, 174), (148, 211), (130, 185),
-				(104, 240), (94, 200), (47, 229), (29, 200)
-			]
-			scaled_points = [(int(x * scale_x + balloon_left), int(y * scale_y + balloon_top)) for x, y in shout_points]
-			draw.polygon(scaled_points, fill='white', outline='black')
 		else:
 			draw.ellipse((balloon_left, balloon_top, balloon_right, balloon_bottom), fill='white')
 		out = Image.alpha_composite(base, overlay)
@@ -546,8 +635,8 @@ class Puppet():
 		font_size = getattr(self, 'font_size', 15)
 		font = ImageFont.truetype(self.fontfile, font_size)
 
-		# Draw curved tail on top of character (for 'say' mode) using SVG
-		if hasattr(self, 'tail_data') and self.tail_data:
+		# Draw curved tail on top of character (for 'say' mode only) using SVG
+		if hasattr(self, 'tail_data') and self.tail_data and self.verb == 'say':
 			tail = self.tail_data
 
 			attach1 = tail['attach1']
